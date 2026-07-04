@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>クエストログ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Sans+JP:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0F1424;
+    --bg-elevated: #171E33;
+    --bg-card: #1C2440;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --cyan: #4FD8FF;
+    --cyan-dim: rgba(79,216,255,0.15);
+    --amber: #FFB454;
+    --amber-dim: rgba(255,180,84,0.15);
+    --success: #6EE7A8;
+    --success-dim: rgba(110,231,168,0.15);
+    --danger: #FF6B6B;
+    --violet: #B98CFF;
+    --violet-dim: rgba(185,140,255,0.15);
+    --text: #EAF0FF;
+    --text-dim: #8B95B8;
+    --text-faint: #5A6383;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0; height:100%;}
+  body{
+    background: radial-gradient(ellipse at top, #171E3A 0%, #0F1424 55%);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    display:flex;
+    justify-content:center;
+    min-height:100vh;
+  }
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .mono{ font-family:'Space Mono', monospace; }
+  .display{ font-family:'Dela Gothic One', sans-serif; }
+
+  /* ---------- Header ---------- */
+  header.topbar{
+    padding:20px 18px 14px;
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg, rgba(79,216,255,0.06), transparent);
+  }
+  .topbar-row{ display:flex; align-items:center; justify-content:space-between; }
+  .brand{ display:flex; flex-direction:column; }
+  .brand .title{ font-size:20px; letter-spacing:0.5px; color:var(--text); }
+  .brand .date{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .level-badge{
+    display:flex; align-items:center; gap:6px;
+    background:var(--bg-card); border:1px solid var(--border-strong);
+    border-radius:999px; padding:6px 12px 6px 8px;
+  }
+  .level-badge .lv-num{ font-size:16px; color:var(--cyan); }
+  .level-badge .lv-label{ font-size:10px; color:var(--text-dim); }
+  .xp-bar-wrap{ margin-top:14px; }
+  .xp-bar-labels{ display:flex; justify-content:space-between; font-size:10px; color:var(--text-faint); margin-bottom:5px; }
+  .xp-bar-track{ height:8px; background:var(--bg-card); border-radius:99px; overflow:hidden; border:1px solid var(--border); }
+  .xp-bar-fill{ height:100%; border-radius:99px; background:linear-gradient(90deg, var(--cyan), #7CF0FF); transition:width .5s ease; }
+  .streak-row{ display:flex; align-items:center; gap:6px; margin-top:10px; font-size:12px; color:var(--amber); }
+
+  /* ---------- Tabs content ---------- */
+  main{ flex:1; overflow-y:auto; padding:16px 16px 100px; }
+  .tab-panel{ display:none; animation: fadeIn .25s ease; }
+  .tab-panel.active{ display:block; }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+  .section-label{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; color:var(--text-dim); letter-spacing:1px;
+    margin: 4px 0 10px;
+  }
+  .section-label .count{
+    background:var(--bg-card); padding:1px 8px; border-radius:99px; font-family:'Space Mono',monospace;
+  }
+
+  .empty-state{
+    text-align:center; padding:40px 20px; color:var(--text-faint);
+    border:1px dashed var(--border-strong); border-radius:16px; font-size:13px; line-height:1.7;
+  }
+
+  /* Quest item */
+  .quest-item{
+    position:relative;
+    display:flex; align-items:center; gap:12px;
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:10px;
+    overflow:hidden;
+    transition: transform .15s ease, border-color .2s ease;
+  }
+  .quest-item.done{ border-color: rgba(110,231,168,0.35); }
+  .checkbox{
+    flex-shrink:0;
+    width:26px; height:26px;
+    border-radius:8px;
+    border:2px solid var(--border-strong);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition: all .15s ease;
+    background:transparent;
+  }
+  .checkbox.checked{
+    background: var(--success);
+    border-color: var(--success);
+    transform: scale(1.05);
+  }
+  .checkbox svg{ width:15px; height:15px; opacity:0; transform:scale(0.5); transition:all .15s ease; }
+  .checkbox.checked svg{ opacity:1; transform:scale(1); }
+  .quest-text{ flex:1; font-size:14px; line-height:1.5; word-break:break-word; }
+  .quest-item.done .quest-text{ color: var(--text-faint); text-decoration: line-through; }
+  .delete-btn{
+    flex-shrink:0; width:28px; height:28px; border-radius:8px; border:none;
+    background:transparent; color:var(--text-faint); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+  }
+  .delete-btn:active{ background:rgba(255,107,107,0.15); color:var(--danger); }
+  .clear-stamp{
+    position:absolute; right:-6px; top:-6px;
+    background:var(--success); color:#0F1424;
+    font-family:'Dela Gothic One', sans-serif;
+    font-size:9px; padding:3px 10px;
+    transform: rotate(18deg);
+    border-radius:4px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    animation: stampIn .35s cubic-bezier(.34,1.56,.64,1);
+    pointer-events:none;
+  }
+  @keyframes stampIn{ from{ transform:rotate(18deg) scale(0); opacity:0;} to{ transform:rotate(18deg) scale(1); opacity:1;} }
+
+  /* Add bar */
+  .add-bar{
+    display:flex; gap:8px; margin-bottom:16px;
+  }
+  .add-bar input[type=text]{
+    flex:1; background:var(--bg-card); border:1px solid var(--border-strong);
+    border-radius:12px; padding:12px 14px; color:var(--text); font-size:14px;
+    font-family:'Noto Sans JP', sans-serif;
+  }
+  .add-bar input[type=text]:focus{ outline:none; border-color:var(--cyan); }
+  .add-btn{
+    flex-shrink:0; width:46px; height:46px; border-radius:12px; border:none;
+    background:var(--cyan); color:#0F1424; font-size:22px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-weight:bold;
+  }
+  .add-btn:active{ transform:scale(0.94); }
+
+  /* Prints */
+  .print-btn-row{ margin-bottom:16px; }
+  .photo-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--amber-dim); border:1px dashed var(--amber);
+    color:var(--amber); border-radius:14px; padding:16px; font-size:14px;
+    cursor:pointer; font-weight:700;
+  }
+  .print-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+  .print-card{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:14px;
+    overflow:hidden; cursor:pointer;
+  }
+  .print-card img{ width:100%; height:120px; object-fit:cover; display:block; }
+  .print-meta{ padding:8px 10px 10px; }
+  .print-date{ font-size:11px; color:var(--cyan); font-family:'Space Mono',monospace; }
+  .print-memo{ font-size:12px; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Parent tab */
+  .parent-info{
+    background:var(--cyan-dim); border:1px solid rgba(79,216,255,0.3);
+    border-radius:14px; padding:14px; font-size:12px; line-height:1.7; color:var(--text-dim); margin-bottom:16px;
+  }
+  .parent-info b{ color:var(--cyan); }
+  .log-item{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-bottom:10px; display:flex; align-items:center; gap:12px;
+  }
+  .log-icon{
+    width:36px; height:36px; border-radius:10px; background:var(--success-dim);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .log-date{ font-size:13px; font-weight:700; }
+  .log-time{ font-size:11px; color:var(--text-faint); font-family:'Space Mono',monospace; }
+  .log-streak{ margin-left:auto; font-size:11px; color:var(--amber); font-family:'Space Mono',monospace; }
+
+  /* Bottom nav */
+  nav.bottombar{
+    position:absolute; bottom:0; left:0; right:0;
+    display:flex;
+    background:rgba(23,30,51,0.95);
+    backdrop-filter: blur(10px);
+    border-top:1px solid var(--border);
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));
+  }
+  .nav-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:none; border:none; color:var(--text-faint); font-size:10px;
+    padding:8px 2px; border-radius:12px; cursor:pointer; font-family:'Noto Sans JP',sans-serif;
+  }
+  .nav-btn.active{ color:var(--cyan); background:var(--cyan-dim); }
+  .nav-btn svg{ width:20px; height:20px; }
+
+  /* Modal */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:50;
+    display:none; align-items:center; justify-content:center; padding:24px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-box{
+    background:var(--bg-elevated); border:1px solid var(--border-strong);
+    border-radius:18px; padding:20px; max-width:400px; width:100%;
+    max-height:85vh; overflow-y:auto;
+  }
+  .modal-box img{ width:100%; border-radius:12px; margin-bottom:12px; }
+  .modal-title{ font-size:14px; font-weight:700; margin-bottom:4px; }
+  .modal-close{
+    width:100%; padding:12px; background:var(--bg-card); border:1px solid var(--border-strong);
+    border-radius:12px; color:var(--text); font-size:13px; margin-top:8px; cursor:pointer;
+  }
+  .memo-input{
+    width:100%; background:var(--bg-card); border:1px solid var(--border-strong);
+    border-radius:10px; padding:10px 12px; color:var(--text); font-size:13px; margin-top:10px;
+    font-family:'Noto Sans JP', sans-serif;
+  }
+
+  /* ---------- Test schedule tab ---------- */
+  .create-period-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--violet-dim); border:1px dashed var(--violet);
+    color:var(--violet); border-radius:14px; padding:14px; font-size:13px;
+    cursor:pointer; font-weight:700; margin-bottom:14px;
+  }
+  .period-chips{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; }
+  .period-chip{
+    flex-shrink:0; padding:8px 14px; border-radius:99px; font-size:12px;
+    background:var(--bg-card); border:1px solid var(--border-strong); color:var(--text-dim);
+    cursor:pointer; white-space:nowrap;
+  }
+  .period-chip.active{ background:var(--violet-dim); border-color:var(--violet); color:var(--violet); font-weight:700; }
+  .period-card{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:14px;
+  }
+  .period-card-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .period-name{ font-size:15px; font-weight:700; }
+  .period-range{ font-size:11px; color:var(--text-faint); font-family:'Space Mono',monospace; margin-top:2px; }
+  .period-countdown{ font-size:11px; color:var(--amber); margin-top:6px; }
+  .period-del{ background:none; border:none; color:var(--text-faint); font-size:14px; cursor:pointer; padding:4px; }
+  .big-progress-row{ display:flex; align-items:center; gap:14px; margin:14px 0 10px; }
+  .progress-ring-wrap{ position:relative; width:64px; height:64px; flex-shrink:0; }
+  .progress-ring-wrap svg{ width:64px; height:64px; transform:rotate(-90deg); }
+  .progress-ring-pct{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700; font-family:'Space Mono',monospace; color:var(--violet);
+  }
+  .progress-msg{ font-size:13px; line-height:1.6; color:var(--text); font-weight:500; }
+  .subject-bars{ margin-top:6px; }
+  .subject-bar-row{ margin-bottom:9px; }
+  .subject-bar-label{ display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-bottom:4px; }
+  .subject-bar-track{ height:6px; background:var(--bg); border-radius:99px; overflow:hidden; }
+  .subject-bar-fill{ height:100%; border-radius:99px; }
+  .heatmap-row{ display:flex; gap:4px; overflow-x:auto; padding:10px 0 4px; }
+  .heatmap-cell{
+    flex-shrink:0; width:26px; height:26px; border-radius:7px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:9px; color:var(--text-faint); font-family:'Space Mono',monospace;
+    border:1px solid var(--border); cursor:pointer;
+  }
+  .add-task-btn{
+    width:100%; padding:12px; border-radius:12px; border:1px solid var(--border-strong);
+    background:var(--bg-card); color:var(--cyan); font-size:13px; font-weight:700; cursor:pointer;
+    margin:10px 0 16px;
+  }
+  .day-group{ margin-bottom:14px; }
+  .day-group-label{
+    font-size:11px; color:var(--text-faint); font-family:'Space Mono',monospace;
+    margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border);
+  }
+  .subject-tag{
+    display:inline-block; font-size:10px; padding:2px 8px; border-radius:99px;
+    margin-right:8px; flex-shrink:0; font-weight:700;
+  }
+  .subject-chip-input{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .subject-chip-input span{
+    background:var(--bg-card); border:1px solid var(--border-strong); border-radius:99px;
+    padding:4px 10px 4px 12px; font-size:12px; display:flex; align-items:center; gap:6px;
+  }
+  .subject-chip-input span button{ background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:12px; }
+  .field-label{ font-size:11px; color:var(--text-dim); margin:12px 0 6px; }
+  select.memo-input{ -webkit-appearance:none; appearance:none; }
+  .date-range-row{ display:flex; gap:8px; }
+  .date-range-row input{ flex:1; }
+
+  /* Toast */
+  .toast{
+    position:absolute; left:16px; right:16px; bottom:86px;
+    background:var(--bg-elevated); border:1px solid var(--border-strong);
+    border-radius:14px; padding:12px 14px; font-size:13px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    transform: translateY(20px); opacity:0; transition:all .25s ease; pointer-events:none;
+    z-index:40;
+  }
+  .toast.show{ transform:translateY(0); opacity:1; pointer-events:auto; }
+  .toast button{ background:none; border:none; color:var(--cyan); font-weight:700; font-size:13px; cursor:pointer; }
+
+  /* Celebration overlay */
+  .celebrate{
+    position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center;
+    background:rgba(15,20,36,0.88);
+  }
+  .celebrate.show{ display:flex; animation:fadeIn .3s ease; }
+  .celebrate-box{ text-align:center; padding:30px; }
+  .celebrate-box .big{ font-size:22px; margin-bottom:10px; color:var(--success); }
+  .celebrate-box .sub{ font-size:13px; color:var(--text-dim); line-height:1.7; }
+  .celebrate-emoji{ font-size:48px; margin-bottom:14px; animation:pop .5s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes pop{ from{ transform:scale(0);} to{ transform:scale(1);} }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        <div class="title display">クエストログ</div>
+        <div class="date mono" id="todayDateLabel">-</div>
+      </div>
+      <div class="level-badge">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFB454" stroke-width="2"><path d="M12 2l2.9 6.3 6.9.9-5 4.9 1.2 6.9L12 17.8 5.9 21l1.2-6.9-5-4.9 6.9-.9L12 2z"/></svg>
+        <div>
+          <div class="lv-num mono" id="levelNum">1</div>
+          <div class="lv-label">LEVEL</div>
+        </div>
+      </div>
+    </div>
+    <div class="xp-bar-wrap">
+      <div class="xp-bar-labels">
+        <span>XP</span>
+        <span class="mono" id="xpLabel">0 / 100</span>
+      </div>
+      <div class="xp-bar-track"><div class="xp-bar-fill" id="xpFill" style="width:0%"></div></div>
+    </div>
+    <div class="streak-row" id="streakRow" style="display:none;">
+      🔥 <span class="mono" id="streakNum">0</span> 日連続で全クリア中！
+    </div>
+  </header>
+
+  <main>
+    <!-- TODAY TAB -->
+    <section class="tab-panel active" id="tab-today">
+      <div class="section-label">今日だけのクエスト <span class="count mono" id="todayCount">0/0</span></div>
+      <div class="add-bar">
+        <input type="text" id="todayInput" placeholder="例）宿題を仕上げる" maxlength="60">
+        <button class="add-btn" onclick="addTodayTask()">＋</button>
+      </div>
+      <div id="todayList"></div>
+    </section>
+
+    <!-- DAILY TAB -->
+    <section class="tab-panel" id="tab-daily">
+      <div class="section-label">毎日のクエスト <span class="count mono" id="dailyCount">0/0</span></div>
+      <div class="add-bar">
+        <input type="text" id="dailyInput" placeholder="例）歯みがき / ストレッチ" maxlength="60">
+        <button class="add-btn" onclick="addDailyTemplate()">＋</button>
+      </div>
+      <div id="dailyList"></div>
+    </section>
+
+    <!-- TEST SCHEDULE TAB -->
+    <section class="tab-panel" id="tab-test">
+      <div class="section-label">テスト勉強スケジュール</div>
+      <button class="create-period-btn" onclick="openCreatePeriod()">＋ 新しいテスト期間を作る</button>
+      <div class="period-chips" id="periodChips"></div>
+      <div id="periodDetail"></div>
+    </section>
+
+    <!-- PRINTS TAB -->
+    <section class="tab-panel" id="tab-prints">
+      <div class="section-label">プリント倉庫 <span class="count mono" id="printsCount">0</span></div>
+      <div class="print-btn-row">
+        <label class="photo-btn" for="photoInput">
+          📷 プリントを撮影して保存
+        </label>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhoto(event)">
+      </div>
+      <div class="print-grid" id="printGrid"></div>
+    </section>
+
+    <!-- PARENT TAB -->
+    <section class="tab-panel" id="tab-parent">
+      <div class="parent-info">
+        <b>保護者ビュー</b><br>
+        このアプリはこの端末のブラウザの中だけにデータを保存しています。そのため保護者が別のスマホで同じ内容を自動で見ることはできません。<br><br>
+        代わりに、クエストを全部クリアしたりテスト勉強が進んだりすると、下の「保護者に知らせる」ボタンから、LINEなどで達成状況をワンタップで送れます。
+      </div>
+      <button class="create-period-btn" onclick="shareTodaySummary()">📤 今の達成状況を保護者に知らせる</button>
+      <div class="section-label">テスト勉強の進み具合</div>
+      <div id="parentTestProgress"></div>
+      <div class="section-label">達成の記録（この端末内のみ）</div>
+      <div id="parentLog"></div>
+    </section>
+  </main>
+
+  <nav class="bottombar">
+    <button class="nav-btn active" data-tab="today" onclick="switchTab('today')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
+      今日
+    </button>
+    <button class="nav-btn" data-tab="daily" onclick="switchTab('daily')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+      毎日
+    </button>
+    <button class="nav-btn" data-tab="test" onclick="switchTab('test')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h6M9 16h6M9 8h2"/></svg>
+      テスト勉強
+    </button>
+    <button class="nav-btn" data-tab="prints" onclick="switchTab('prints')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 011 1v11a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      プリント
+    </button>
+    <button class="nav-btn" data-tab="parent" onclick="switchTab('parent')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9C1 8 3 4 7 4c2 0 4 1.3 5 3 1-1.7 3-3 5-3 4 0 6 4 4.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg>
+      保護者
+    </button>
+  </nav>
+
+  <div class="toast" id="toast">
+    <span id="toastMsg"></span>
+    <button id="toastUndo" onclick="undoLast()">元に戻す</button>
+  </div>
+
+</div>
+
+<!-- Print viewer modal -->
+<div class="modal-overlay" id="printModal">
+  <div class="modal-box">
+    <img id="printModalImg" src="">
+    <div class="modal-title mono" id="printModalDate"></div>
+    <div class="modal-title" id="printModalMemo" style="color:var(--text-dim); font-weight:400;"></div>
+    <button class="modal-close" onclick="deleteCurrentPrint()" style="color:var(--danger); border-color:rgba(255,107,107,0.4);">この写真を削除</button>
+    <button class="modal-close" onclick="closeModal('printModal')">閉じる</button>
+  </div>
+</div>
+
+<!-- Memo input modal (after taking photo) -->
+<div class="modal-overlay" id="memoModal">
+  <div class="modal-box">
+    <img id="memoModalImg" src="">
+    <div class="modal-title">📅 <span id="memoModalDate" class="mono"></span> のプリントとして保存します</div>
+    <input type="text" class="memo-input" id="memoInput" placeholder="教科やメモ（任意）例）数学プリント" maxlength="40">
+    <button class="modal-close" style="background:var(--cyan); color:#0F1424; font-weight:700; border:none;" onclick="confirmSavePrint()">保存する</button>
+  </div>
+</div>
+
+<!-- Create test period modal -->
+<div class="modal-overlay" id="periodModal">
+  <div class="modal-box">
+    <div class="modal-title">新しいテスト期間</div>
+    <div class="field-label">テスト名</div>
+    <input type="text" class="memo-input" id="periodNameInput" placeholder="例）1学期期末テスト" maxlength="30">
+    <div class="field-label">勉強を始める日 〜 テスト最終日</div>
+    <div class="date-range-row">
+      <input type="date" class="memo-input" id="periodStartInput">
+      <input type="date" class="memo-input" id="periodEndInput">
+    </div>
+    <div class="field-label">科目（入力してEnterで追加）</div>
+    <input type="text" class="memo-input" id="subjectNameInput" placeholder="例）数学" maxlength="20">
+    <div class="subject-chip-input" id="subjectChipList"></div>
+    <button class="modal-close" style="background:var(--violet); color:#0F1424; font-weight:700; border:none; margin-top:16px;" onclick="confirmCreatePeriod()">この内容で作成</button>
+    <button class="modal-close" onclick="closeModal('periodModal')">キャンセル</button>
+  </div>
+</div>
+
+<!-- Add test task modal -->
+<div class="modal-overlay" id="taskModal">
+  <div class="modal-box">
+    <div class="modal-title">勉強タスクを追加</div>
+    <div class="field-label">日付</div>
+    <select class="memo-input" id="taskDateSelect"></select>
+    <div class="field-label">科目</div>
+    <select class="memo-input" id="taskSubjectSelect"></select>
+    <div class="field-label">内容</div>
+    <input type="text" class="memo-input" id="taskTextInput" placeholder="例）ワークP10-15を解く" maxlength="60">
+    <button class="modal-close" style="background:var(--violet); color:#0F1424; font-weight:700; border:none; margin-top:16px;" onclick="confirmAddTask()">追加する</button>
+    <button class="modal-close" onclick="closeModal('taskModal')">キャンセル</button>
+  </div>
+</div>
+
+<!-- Celebration -->
+<div class="celebrate" id="celebrate">
+  <div class="celebrate-box">
+    <div class="celebrate-emoji">🎉</div>
+    <div class="big display" id="celebrateTitle" style="font-size:18px;">全クエスト達成！</div>
+    <div class="sub" id="celebrateSub">お疲れさま！この調子で毎日続けよう。</div>
+    <button class="modal-close" style="margin-top:20px; background:var(--cyan); color:#0F1424; font-weight:700; border:none;" onclick="shareTodaySummary()">📤 保護者に知らせる</button>
+    <button class="modal-close" onclick="closeCelebrate()">とじる</button>
+  </div>
+</div>
+
+<script>
+// ---------------- Utilities ----------------
+function todayKey(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function yesterdayKey(){
+  const d = new Date();
+  d.setDate(d.getDate()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function formatDateLabel(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  const weekdays = ['日','月','火','水','木','金','土'];
+  return `${m}月${d}日(${weekdays[dt.getDay()]})`;
+}
+function nowTimeLabel(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+async function storageGet(key, shared=false){
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+async function storageSet(key, value, shared=false){
+  try{ localStorage.setItem(key, JSON.stringify(value)); }
+  catch(e){ console.error('storage set failed', key, e); showToast('保存容量がいっぱいかも。古いプリント写真を削除してみて'); }
+}
+
+// ---------------- State ----------------
+let TODAY = todayKey();
+let templates = [];        // [{id, text}]
+let todayTasks = [];       // [{id, text, done}]
+let dailyStatus = {};      // {templateId: bool}
+let prints = [];           // [{id, date, dataUrl, memo}]
+let stats = { xp:0, streak:0, lastCompleteDate:null };
+let notifiedDates = {};    // {dateStr: true}
+
+let lastDeleted = null;    // for undo
+let currentPrintId = null;
+let pendingPhoto = null;   // {dataUrl}
+
+let testPeriods = [];       // [{id, name, startDate, endDate, subjects:[{id,name}], milestonesFired:[], createdAt}]
+let testTasksCache = {};    // {periodId: [{id, date, subject, text, done}]}
+let currentPeriodId = null;
+let newSubjects = [];       // temp chip list while creating a period
+const SUBJECT_COLORS = ['#4FD8FF', '#FFB454', '#6EE7A8', '#B98CFF', '#FF6B6B'];
+
+// ---------------- Init ----------------
+async function init(){
+  document.getElementById('todayDateLabel').textContent = formatDateLabel(TODAY);
+
+  templates = (await storageGet('daily-templates')) || [];
+  todayTasks = (await storageGet('today-tasks:'+TODAY)) || [];
+  dailyStatus = (await storageGet('daily-status:'+TODAY)) || {};
+  prints = (await storageGet('prints')) || [];
+  stats = (await storageGet('stats')) || { xp:0, streak:0, lastCompleteDate:null };
+  notifiedDates = (await storageGet('notified-dates')) || {};
+
+  testPeriods = (await storageGet('test-periods')) || [];
+  for(const p of testPeriods){
+    testTasksCache[p.id] = (await storageGet('test-tasks:'+p.id)) || [];
+  }
+  if(testPeriods.length > 0){
+    // default to the soonest period whose end date hasn't passed, else the most recent
+    const upcoming = testPeriods.filter(p => p.endDate >= TODAY).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+    currentPeriodId = (upcoming[0] || testPeriods[testPeriods.length-1]).id;
+  }
+
+  renderAll();
+}
+
+function renderAll(){
+  renderStats();
+  renderToday();
+  renderDaily();
+  renderPrints();
+  renderParentLog();
+  renderTestTab();
+}
+
+// ---------------- Stats / XP ----------------
+function renderStats(){
+  const level = Math.floor(stats.xp/100)+1;
+  const xpInLevel = stats.xp % 100;
+  document.getElementById('levelNum').textContent = level;
+  document.getElementById('xpLabel').textContent = `${xpInLevel} / 100`;
+  document.getElementById('xpFill').style.width = xpInLevel+'%';
+  const streakRow = document.getElementById('streakRow');
+  if(stats.streak > 0){
+    streakRow.style.display = 'flex';
+    document.getElementById('streakNum').textContent = stats.streak;
+  } else {
+    streakRow.style.display = 'none';
+  }
+}
+async function addXp(amount){
+  stats.xp += amount;
+  await storageSet('stats', stats);
+  renderStats();
+}
+
+// ---------------- Today tasks ----------------
+function renderToday(){
+  const list = document.getElementById('todayList');
+  const doneCount = todayTasks.filter(t=>t.done).length;
+  document.getElementById('todayCount').textContent = `${doneCount}/${todayTasks.length}`;
+  if(todayTasks.length === 0){
+    list.innerHTML = `<div class="empty-state">今日のクエストはまだ空っぽ。<br>上の入力欄から追加しよう。</div>`;
+    return;
+  }
+  list.innerHTML = todayTasks.map(t => questItemHTML(t.id, t.text, t.done, 'today')).join('');
+}
+async function addTodayTask(){
+  const input = document.getElementById('todayInput');
+  const text = input.value.trim();
+  if(!text) return;
+  todayTasks.push({ id: uid(), text, done:false });
+  input.value = '';
+  await storageSet('today-tasks:'+TODAY, todayTasks);
+  renderToday();
+}
+async function toggleToday(id){
+  const t = todayTasks.find(x=>x.id===id);
+  if(!t) return;
+  t.done = !t.done;
+  await storageSet('today-tasks:'+TODAY, todayTasks);
+  if(t.done) await addXp(10);
+  renderToday();
+  renderStats();
+  checkAllComplete();
+}
+async function deleteToday(id){
+  const idx = todayTasks.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  lastDeleted = { type:'today', item: todayTasks[idx], index: idx };
+  todayTasks.splice(idx,1);
+  await storageSet('today-tasks:'+TODAY, todayTasks);
+  renderToday();
+  showToast('クエストを削除したよ');
+}
+
+// ---------------- Daily templates ----------------
+function renderDaily(){
+  const list = document.getElementById('dailyList');
+  const doneCount = templates.filter(t=>dailyStatus[t.id]).length;
+  document.getElementById('dailyCount').textContent = `${doneCount}/${templates.length}`;
+  if(templates.length === 0){
+    list.innerHTML = `<div class="empty-state">毎日やることを登録しよう。<br>一度追加すると、毎日ここに表示されるよ。</div>`;
+    return;
+  }
+  list.innerHTML = templates.map(t => questItemHTML(t.id, t.text, !!dailyStatus[t.id], 'daily')).join('');
+}
+async function addDailyTemplate(){
+  const input = document.getElementById('dailyInput');
+  const text = input.value.trim();
+  if(!text) return;
+  templates.push({ id: uid(), text });
+  input.value = '';
+  await storageSet('daily-templates', templates);
+  renderDaily();
+}
+async function toggleDaily(id){
+  dailyStatus[id] = !dailyStatus[id];
+  await storageSet('daily-status:'+TODAY, dailyStatus);
+  if(dailyStatus[id]) await addXp(10);
+  renderDaily();
+  renderStats();
+  checkAllComplete();
+}
+async function deleteDaily(id){
+  const idx = templates.findIndex(x=>x.id===id);
+  if(idx<0) return;
+  lastDeleted = { type:'daily', item: templates[idx], index: idx };
+  templates.splice(idx,1);
+  delete dailyStatus[id];
+  await storageSet('daily-templates', templates);
+  await storageSet('daily-status:'+TODAY, dailyStatus);
+  renderDaily();
+  showToast('毎日クエストを削除したよ');
+}
+
+// ---------------- Shared quest item renderer ----------------
+function questItemHTML(id, text, done, kind){
+  return `
+    <div class="quest-item ${done?'done':''}">
+      ${done ? '<div class="clear-stamp">CLEAR</div>' : ''}
+      <div class="checkbox ${done?'checked':''}" onclick="${kind==='today' ? `toggleToday('${id}')` : `toggleDaily('${id}')`}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0F1424" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>
+      </div>
+      <div class="quest-text">${escapeHtml(text)}</div>
+      <button class="delete-btn" onclick="${kind==='today' ? `deleteToday('${id}')` : `deleteDaily('${id}')`}">✕</button>
+    </div>`;
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------------- Completion check + parent notify ----------------
+async function checkAllComplete(){
+  const totalTasks = todayTasks.length + templates.length;
+  if(totalTasks === 0) return;
+  const todayDone = todayTasks.every(t=>t.done);
+  const dailyDone = templates.every(t=>dailyStatus[t.id]);
+  if(!todayDone || !dailyDone) return;
+  if(notifiedDates[TODAY]) return; // already notified today
+
+  notifiedDates[TODAY] = true;
+  await storageSet('notified-dates', notifiedDates);
+
+  // streak calc
+  if(stats.lastCompleteDate === yesterdayKey()){
+    stats.streak += 1;
+  } else {
+    stats.streak = 1;
+  }
+  stats.lastCompleteDate = TODAY;
+  stats.xp += 30; // bonus
+  await storageSet('stats', stats);
+  renderStats();
+
+  // write to shared parent log
+  const parentLog = (await storageGet('parent-status', true)) || [];
+  parentLog.unshift({ type:'daily', date: TODAY, time: nowTimeLabel(), streak: stats.streak });
+  await storageSet('parent-status', parentLog, true);
+  renderParentLog();
+
+  showCelebrate();
+}
+
+// ---------------- Test schedule ----------------
+function dateRangeArray(start, end){
+  const out = [];
+  let [y,m,d] = start.split('-').map(Number);
+  const endParts = end.split('-').map(Number);
+  let cur = new Date(y, m-1, d);
+  const endDate = new Date(endParts[0], endParts[1]-1, endParts[2]);
+  while(cur <= endDate){
+    out.push(cur.getFullYear()+'-'+String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0'));
+    cur.setDate(cur.getDate()+1);
+  }
+  return out;
+}
+function subjectColor(subjectName, subjects){
+  const idx = subjects.findIndex(s=>s.name===subjectName);
+  return SUBJECT_COLORS[(idx<0?0:idx) % SUBJECT_COLORS.length];
+}
+function progressTierMessage(pct){
+  if(pct >= 100) return '全部やりきった！すごい！🎉';
+  if(pct >= 80) return 'あと少し！ラストスパートだ';
+  if(pct >= 50) return '順調に進んでるね！この調子';
+  if(pct > 0) return 'いいスタート！コツコツ続けよう';
+  return 'これから始めよう！';
+}
+function countdownLabel(period){
+  if(TODAY < period.startDate) return `勉強スタートまであと${diffDays(TODAY, period.startDate)}日`;
+  if(TODAY > period.endDate) return 'このテストは終了しました';
+  return `テスト最終日まであと${diffDays(TODAY, period.endDate)}日`;
+}
+function diffDays(a,b){
+  const [ay,am,ad]=a.split('-').map(Number), [by,bm,bd]=b.split('-').map(Number);
+  const d1=new Date(ay,am-1,ad), d2=new Date(by,bm-1,bd);
+  return Math.max(0, Math.round((d2-d1)/86400000));
+}
+
+function openCreatePeriod(){
+  document.getElementById('periodNameInput').value = '';
+  document.getElementById('periodStartInput').value = TODAY;
+  document.getElementById('periodEndInput').value = TODAY;
+  document.getElementById('subjectNameInput').value = '';
+  newSubjects = [];
+  renderSubjectChipInput();
+  openModal('periodModal');
+}
+function renderSubjectChipInput(){
+  document.getElementById('subjectChipList').innerHTML = newSubjects.map((s,i) => `
+    <span>${escapeHtml(s)}<button onclick="removeNewSubject(${i})">✕</button></span>`).join('');
+}
+function removeNewSubject(i){ newSubjects.splice(i,1); renderSubjectChipInput(); }
+document.addEventListener('DOMContentLoaded', ()=>{
+  const si = document.getElementById('subjectNameInput');
+  si.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){
+      const v = si.value.trim();
+      if(v && !newSubjects.includes(v)){ newSubjects.push(v); si.value=''; renderSubjectChipInput(); }
+    }
+  });
+});
+async function confirmCreatePeriod(){
+  const name = document.getElementById('periodNameInput').value.trim();
+  const start = document.getElementById('periodStartInput').value;
+  const end = document.getElementById('periodEndInput').value;
+  if(!name || !start || !end || start > end){
+    showToast('テスト名と正しい期間を入力してね');
+    return;
+  }
+  const period = {
+    id: uid(), name, startDate: start, endDate: end,
+    subjects: newSubjects.map(n => ({ id: uid(), name: n })),
+    milestonesFired: [], createdAt: Date.now()
+  };
+  testPeriods.push(period);
+  testTasksCache[period.id] = [];
+  currentPeriodId = period.id;
+  await storageSet('test-periods', testPeriods);
+  await storageSet('test-tasks:'+period.id, []);
+  closeModal('periodModal');
+  renderTestTab();
+}
+async function deletePeriod(id){
+  if(!confirm('このテスト期間と勉強タスクをすべて削除する？')) return;
+  testPeriods = testPeriods.filter(p=>p.id!==id);
+  delete testTasksCache[id];
+  await storageSet('test-periods', testPeriods);
+  if(currentPeriodId === id){
+    currentPeriodId = testPeriods.length ? testPeriods[testPeriods.length-1].id : null;
+  }
+  renderTestTab();
+}
+function selectPeriod(id){ currentPeriodId = id; renderTestTab(); }
+
+function openAddTask(){
+  const period = testPeriods.find(p=>p.id===currentPeriodId);
+  if(!period) return;
+  const dates = dateRangeArray(period.startDate, period.endDate);
+  document.getElementById('taskDateSelect').innerHTML = dates.map(d => `<option value="${d}">${formatDateLabel(d)}</option>`).join('');
+  const subjOptions = period.subjects.length
+    ? period.subjects.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('')
+    : `<option value="その他">その他</option>`;
+  document.getElementById('taskSubjectSelect').innerHTML = subjOptions;
+  document.getElementById('taskTextInput').value = '';
+  openModal('taskModal');
+}
+async function confirmAddTask(){
+  const period = testPeriods.find(p=>p.id===currentPeriodId);
+  if(!period) return;
+  const date = document.getElementById('taskDateSelect').value;
+  const subject = document.getElementById('taskSubjectSelect').value;
+  const text = document.getElementById('taskTextInput').value.trim();
+  if(!text) return;
+  testTasksCache[period.id].push({ id: uid(), date, subject, text, done:false });
+  await storageSet('test-tasks:'+period.id, testTasksCache[period.id]);
+  closeModal('taskModal');
+  renderTestTab();
+}
+async function toggleTestTask(periodId, taskId){
+  const tasks = testTasksCache[periodId];
+  const t = tasks.find(x=>x.id===taskId);
+  if(!t) return;
+  t.done = !t.done;
+  await storageSet('test-tasks:'+periodId, tasks);
+  if(t.done) await addXp(10);
+  renderTestTab();
+  await checkTestMilestones(periodId);
+}
+async function deleteTestTask(periodId, taskId){
+  testTasksCache[periodId] = testTasksCache[periodId].filter(x=>x.id!==taskId);
+  await storageSet('test-tasks:'+periodId, testTasksCache[periodId]);
+  renderTestTab();
+}
+
+function computePeriodStats(period){
+  const tasks = testTasksCache[period.id] || [];
+  const total = tasks.length;
+  const done = tasks.filter(t=>t.done).length;
+  const pct = total === 0 ? 0 : Math.round((done/total)*100);
+  const subjectStats = period.subjects.map(s => {
+    const st = tasks.filter(t=>t.subject===s.name);
+    return { name: s.name, done: st.filter(t=>t.done).length, total: st.length };
+  });
+  const dayStats = dateRangeArray(period.startDate, period.endDate).map(d => {
+    const dt = tasks.filter(t=>t.date===d);
+    const dpct = dt.length === 0 ? null : Math.round((dt.filter(t=>t.done).length/dt.length)*100);
+    return { date: d, pct: dpct, count: dt.length };
+  });
+  return { total, done, pct, subjectStats, dayStats };
+}
+
+async function checkTestMilestones(periodId){
+  const period = testPeriods.find(p=>p.id===periodId);
+  if(!period) return;
+  const { pct, total } = computePeriodStats(period);
+  if(total === 0) return;
+  const thresholds = [50,80,100];
+  for(const th of thresholds){
+    if(pct >= th && !period.milestonesFired.includes(th)){
+      period.milestonesFired.push(th);
+      const parentLog = (await storageGet('parent-status', true)) || [];
+      parentLog.unshift({ type:'test-milestone', date: TODAY, time: nowTimeLabel(), testName: period.name, percent: th });
+      await storageSet('parent-status', parentLog, true);
+      if(th === 100) showCelebrate('テスト勉強を100%達成！お疲れさま！');
+    }
+  }
+  await storageSet('test-periods', testPeriods);
+  await pushSharedTestProgress();
+  renderParentLog();
+}
+async function pushSharedTestProgress(){
+  const map = {};
+  for(const p of testPeriods){
+    const s = computePeriodStats(p);
+    map[p.id] = { name: p.name, startDate: p.startDate, endDate: p.endDate, pct: s.pct, subjectStats: s.subjectStats, updatedAt: Date.now() };
+  }
+  await storageSet('shared-test-progress', map, true);
+}
+
+function renderTestTab(){
+  const chips = document.getElementById('periodChips');
+  if(testPeriods.length === 0){
+    chips.innerHTML = '';
+    document.getElementById('periodDetail').innerHTML = `<div class="empty-state">まだテスト期間が登録されていません。<br>上のボタンからテスト勉強の計画を作ろう。</div>`;
+    return;
+  }
+  chips.innerHTML = testPeriods.map(p => `
+    <div class="period-chip ${p.id===currentPeriodId?'active':''}" onclick="selectPeriod('${p.id}')">${escapeHtml(p.name)}</div>`).join('');
+
+  const period = testPeriods.find(p=>p.id===currentPeriodId) || testPeriods[testPeriods.length-1];
+  currentPeriodId = period.id;
+  const pstats = computePeriodStats(period);
+  const circumference = 2 * Math.PI * 27;
+  const offset = circumference * (1 - pstats.pct/100);
+
+  let html = `
+    <div class="period-card">
+      <div class="period-card-head">
+        <div>
+          <div class="period-name">${escapeHtml(period.name)}</div>
+          <div class="period-range mono">${formatDateLabel(period.startDate)} 〜 ${formatDateLabel(period.endDate)}</div>
+          <div class="period-countdown">${countdownLabel(period)}</div>
+        </div>
+        <button class="period-del" onclick="deletePeriod('${period.id}')">🗑</button>
+      </div>
+      <div class="big-progress-row">
+        <div class="progress-ring-wrap">
+          <svg viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="27" stroke="var(--bg)" stroke-width="7" fill="none"/>
+            <circle cx="32" cy="32" r="27" stroke="var(--violet)" stroke-width="7" fill="none"
+              stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+          </svg>
+          <div class="progress-ring-pct">${pstats.pct}%</div>
+        </div>
+        <div class="progress-msg">${progressTierMessage(pstats.pct)}<br><span style="color:var(--text-faint); font-size:11px;">${pstats.done} / ${pstats.total} タスク完了</span></div>
+      </div>`;
+
+  if(pstats.subjectStats.length){
+    html += `<div class="subject-bars">`;
+    pstats.subjectStats.forEach(s => {
+      const spct = s.total === 0 ? 0 : Math.round((s.done/s.total)*100);
+      const color = subjectColor(s.name, period.subjects);
+      html += `
+        <div class="subject-bar-row">
+          <div class="subject-bar-label"><span>${escapeHtml(s.name)}</span><span class="mono">${s.done}/${s.total}</span></div>
+          <div class="subject-bar-track"><div class="subject-bar-fill" style="width:${spct}%; background:${color};"></div></div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="heatmap-row">`;
+  pstats.dayStats.forEach(d => {
+    let bg = 'transparent';
+    if(d.pct === 100) bg = 'var(--success)';
+    else if(d.pct !== null && d.pct >= 50) bg = 'rgba(255,180,84,0.5)';
+    else if(d.pct !== null && d.pct >= 0) bg = 'rgba(255,107,107,0.35)';
+    const dayNum = Number(d.date.split('-')[2]);
+    html += `<div class="heatmap-cell" style="background:${bg};" title="${d.date}">${dayNum}</div>`;
+  });
+  html += `</div></div>`;
+
+  html += `<button class="add-task-btn" onclick="openAddTask()">＋ 勉強タスクを追加</button>`;
+
+  const tasks = testTasksCache[period.id] || [];
+  if(tasks.length === 0){
+    html += `<div class="empty-state">まだタスクがないよ。<br>科目ごとに小さく分けて計画してみよう。</div>`;
+  } else {
+    const byDate = {};
+    tasks.forEach(t => { (byDate[t.date] = byDate[t.date] || []).push(t); });
+    Object.keys(byDate).sort().forEach(date => {
+      html += `<div class="day-group"><div class="day-group-label">${formatDateLabel(date)}</div>`;
+      byDate[date].forEach(t => {
+        const color = subjectColor(t.subject, period.subjects);
+        html += `
+          <div class="quest-item ${t.done?'done':''}">
+            ${t.done ? '<div class="clear-stamp">CLEAR</div>' : ''}
+            <div class="checkbox ${t.done?'checked':''}" onclick="toggleTestTask('${period.id}','${t.id}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#0F1424" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>
+            </div>
+            <div class="quest-text"><span class="subject-tag" style="background:${color}33; color:${color};">${escapeHtml(t.subject)}</span>${escapeHtml(t.text)}</div>
+            <button class="delete-btn" onclick="deleteTestTask('${period.id}','${t.id}')">✕</button>
+          </div>`;
+      });
+      html += `</div>`;
+    });
+  }
+
+  document.getElementById('periodDetail').innerHTML = html;
+  pushSharedTestProgress();
+}
+
+async function renderParentTestProgress(){
+  const map = (await storageGet('shared-test-progress', true)) || {};
+  const el = document.getElementById('parentTestProgress');
+  const entries = Object.values(map).sort((a,b)=> b.updatedAt - a.updatedAt);
+  if(entries.length === 0){
+    el.innerHTML = `<div class="empty-state">まだテスト勉強の計画がありません。</div>`;
+    return;
+  }
+  el.innerHTML = entries.map(p => `
+    <div class="period-card">
+      <div class="period-name">${escapeHtml(p.name)}</div>
+      <div class="period-range mono">${formatDateLabel(p.startDate)} 〜 ${formatDateLabel(p.endDate)}</div>
+      <div class="big-progress-row">
+        <div class="progress-ring-wrap" style="width:48px; height:48px;">
+          <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" stroke="var(--bg)" stroke-width="7" fill="none"/>
+          <circle cx="32" cy="32" r="27" stroke="var(--violet)" stroke-width="7" fill="none"
+            stroke-dasharray="${2*Math.PI*27}" stroke-dashoffset="${2*Math.PI*27*(1-p.pct/100)}" stroke-linecap="round"/></svg>
+          <div class="progress-ring-pct" style="font-size:11px;">${p.pct}%</div>
+        </div>
+        <div class="progress-msg" style="font-size:12px;">${progressTierMessage(p.pct)}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ---------------- Prints ----------------
+function renderPrints(){
+  document.getElementById('printsCount').textContent = prints.length;
+  const grid = document.getElementById('printGrid');
+  if(prints.length === 0){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">まだプリントがないよ。<br>撮影ボタンから追加しよう。</div>`;
+    return;
+  }
+  grid.innerHTML = prints.map(p => `
+    <div class="print-card" onclick="openPrint('${p.id}')">
+      <img src="${p.dataUrl}">
+      <div class="print-meta">
+        <div class="print-date">${formatDateLabel(p.date)}</div>
+        <div class="print-memo">${escapeHtml(p.memo || 'メモなし')}</div>
+      </div>
+    </div>`).join('');
+}
+function handlePhoto(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 900;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      pendingPhoto = { dataUrl };
+      document.getElementById('memoModalImg').src = dataUrl;
+      document.getElementById('memoModalDate').textContent = formatDateLabel(TODAY);
+      document.getElementById('memoInput').value = '';
+      openModal('memoModal');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+async function confirmSavePrint(){
+  if(!pendingPhoto) return;
+  const memo = document.getElementById('memoInput').value.trim();
+  prints.unshift({ id: uid(), date: TODAY, dataUrl: pendingPhoto.dataUrl, memo });
+  await storageSet('prints', prints);
+  pendingPhoto = null;
+  closeModal('memoModal');
+  renderPrints();
+}
+function openPrint(id){
+  const p = prints.find(x=>x.id===id);
+  if(!p) return;
+  currentPrintId = id;
+  document.getElementById('printModalImg').src = p.dataUrl;
+  document.getElementById('printModalDate').textContent = formatDateLabel(p.date);
+  document.getElementById('printModalMemo').textContent = p.memo || 'メモなし';
+  openModal('printModal');
+}
+async function deleteCurrentPrint(){
+  prints = prints.filter(x=>x.id!==currentPrintId);
+  await storageSet('prints', prints);
+  closeModal('printModal');
+  renderPrints();
+}
+
+// ---------------- Parent log ----------------
+async function renderParentLog(){
+  const parentLog = (await storageGet('parent-status', true)) || [];
+  const el = document.getElementById('parentLog');
+  if(parentLog.length === 0){
+    el.innerHTML = `<div class="empty-state">まだ達成の記録はありません。<br>全部のクエストをクリアするか、テスト勉強が進むと、ここに記録されます。</div>`;
+    return;
+  }
+  el.innerHTML = parentLog.slice(0,30).map(l => {
+    if(l.type === 'test-milestone'){
+      const msg = l.percent === 100 ? '目標を100%達成！' : `${l.percent}%まで到達！`;
+      return `
+      <div class="log-item">
+        <div class="log-icon" style="background:var(--violet-dim);">📘</div>
+        <div>
+          <div class="log-date">${escapeHtml(l.testName)}</div>
+          <div class="log-time">${formatDateLabel(l.date)} ${l.time} — ${msg}</div>
+        </div>
+      </div>`;
+    }
+    return `
+    <div class="log-item">
+      <div class="log-icon">✅</div>
+      <div>
+        <div class="log-date">${formatDateLabel(l.date)} 全クリア</div>
+        <div class="log-time">${l.time} に完了</div>
+      </div>
+      <div class="log-streak">🔥${l.streak}日目</div>
+    </div>`;
+  }).join('');
+}
+
+// ---------------- Toast / undo ----------------
+let toastTimer = null;
+function showToast(msg){
+  document.getElementById('toastMsg').textContent = msg;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 4000);
+}
+async function undoLast(){
+  if(!lastDeleted) return;
+  if(lastDeleted.type === 'today'){
+    todayTasks.splice(lastDeleted.index, 0, lastDeleted.item);
+    await storageSet('today-tasks:'+TODAY, todayTasks);
+    renderToday();
+  } else {
+    templates.splice(lastDeleted.index, 0, lastDeleted.item);
+    await storageSet('daily-templates', templates);
+    renderDaily();
+  }
+  lastDeleted = null;
+  document.getElementById('toast').classList.remove('show');
+}
+
+// ---------------- Modals ----------------
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function showCelebrate(customTitle){
+  if(customTitle){
+    document.getElementById('celebrateTitle').textContent = customTitle;
+    document.getElementById('celebrateSub').innerHTML = 'お疲れさま！下のボタンで保護者に知らせよう。';
+  } else {
+    document.getElementById('celebrateTitle').textContent = '全クエスト達成！';
+    document.getElementById('celebrateSub').innerHTML = 'お疲れさま！この調子で毎日続けよう。';
+  }
+  document.getElementById('celebrate').classList.add('show');
+}
+
+async function buildSummaryText(){
+  const doneToday = todayTasks.filter(t=>t.done).length;
+  const doneDaily = templates.filter(t=>dailyStatus[t.id]).length;
+  const lines = [`📋 ${formatDateLabel(TODAY)} の達成状況`];
+  if(todayTasks.length) lines.push(`今日のクエスト: ${doneToday}/${todayTasks.length}`);
+  if(templates.length) lines.push(`毎日のクエスト: ${doneDaily}/${templates.length}`);
+  if(stats.streak > 0) lines.push(`🔥 ${stats.streak}日連続で全クリア中`);
+  const period = testPeriods.find(p=>p.id===currentPeriodId);
+  if(period){
+    const s = computePeriodStats(period);
+    if(s.total > 0) lines.push(`📘 ${period.name}: ${s.pct}%達成 (${s.done}/${s.total}タスク)`);
+  }
+  return lines.join('\n');
+}
+async function shareTodaySummary(){
+  const text = await buildSummaryText();
+  if(navigator.share){
+    try{ await navigator.share({ title:'クエストログ 達成状況', text }); return; }
+    catch(e){ /* user cancelled share sheet, fall through to clipboard */ }
+  }
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('コピーしたよ。LINEなどに貼り付けて送ろう');
+  }catch(e){
+    window.prompt('この内容をコピーしてLINEなどで送ってね', text);
+  }
+}
+function closeCelebrate(){ document.getElementById('celebrate').classList.remove('show'); }
+
+// ---------------- Tabs ----------------
+function switchTab(name){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.nav-btn[data-tab="${name}"]`).classList.add('active');
+  if(name === 'parent'){ renderParentLog(); renderParentTestProgress(); }
+}
+
+// Enter key support
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('todayInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addTodayTask(); });
+  document.getElementById('dailyInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addDailyTemplate(); });
+});
+
+init();
+</script>
+</body>
+</html>
