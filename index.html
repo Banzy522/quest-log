@@ -327,6 +327,20 @@
   .celebrate-emoji{ font-size:48px; margin-bottom:14px; animation:pop .5s cubic-bezier(.34,1.56,.64,1); }
   @keyframes pop{ from{ transform:scale(0);} to{ transform:scale(1);} }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyANWVqErP0fYNNNUZ1XQaTSmbMkoAMeSU0",
+    authDomain: "quest-log-dc108.firebaseapp.com",
+    projectId: "quest-log-dc108",
+    storageBucket: "quest-log-dc108.firebasestorage.app",
+    messagingSenderId: "933908392429",
+    appId: "1:933908392429:web:af7195d3f75bb63faa5fe4"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
 </head>
 <body>
 
@@ -403,13 +417,13 @@
     <section class="tab-panel" id="tab-parent">
       <div class="parent-info">
         <b>保護者ビュー</b><br>
-        このアプリはこの端末のブラウザの中だけにデータを保存しています。そのため保護者が別のスマホで同じ内容を自動で見ることはできません。<br><br>
-        代わりに、クエストを全部クリアしたりテスト勉強が進んだりすると、下の「保護者に知らせる」ボタンから、LINEなどで達成状況をワンタップで送れます。
+        このタブの内容は、子どものスマホでの入力にあわせてリアルタイムで更新されます。同じサイトを保護者のスマホでも開いておけば、自動で最新の状況が表示されます。<br><br>
+        すぐに一言伝えたいときは、下のボタンからLINEなどでも送れます。
       </div>
       <button class="create-period-btn" onclick="shareTodaySummary()">📤 今の達成状況を保護者に知らせる</button>
       <div class="section-label">テスト勉強の進み具合</div>
       <div id="parentTestProgress"></div>
-      <div class="section-label">達成の記録（この端末内のみ）</div>
+      <div class="section-label">達成の記録</div>
       <div id="parentLog"></div>
     </section>
   </main>
@@ -533,15 +547,56 @@ function nowTimeLabel(){
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
+function docIdFor(key){ return key.replace(/:/g, '__'); }
+
 async function storageGet(key, shared=false){
   try{
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){ return null; }
+    const snap = await db.collection('quest-log-data').doc(docIdFor(key)).get();
+    if(!snap.exists) return null;
+    const data = snap.data();
+    return data ? data.value : null;
+  }catch(e){ console.error('storage get failed', key, e); return null; }
 }
 async function storageSet(key, value, shared=false){
-  try{ localStorage.setItem(key, JSON.stringify(value)); }
-  catch(e){ console.error('storage set failed', key, e); showToast('保存容量がいっぱいかも。古いプリント写真を削除してみて'); }
+  try{
+    await db.collection('quest-log-data').doc(docIdFor(key)).set({ value, updatedAt: Date.now() });
+  }catch(e){
+    console.error('storage set failed', key, e);
+    showToast('保存に失敗したかも。通信状況を確認してね');
+  }
+}
+
+// ---- Prints get their own Firestore collection (one document per photo) ----
+// because embedded photos can be too large to safely pack into one shared document.
+async function loadPrints(){
+  try{
+    const snap = await db.collection('prints').orderBy('date','desc').get();
+    prints = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }catch(e){ console.error('load prints failed', e); prints = prints || []; }
+}
+async function addPrintDoc(printObj){
+  try{
+    await db.collection('prints').doc(printObj.id).set({ date: printObj.date, dataUrl: printObj.dataUrl, memo: printObj.memo || '' });
+  }catch(e){
+    console.error('add print failed', e);
+    showToast('写真の保存に失敗したかも（サイズが大きすぎるかも）');
+  }
+}
+async function deletePrintDoc(id){
+  try{ await db.collection('prints').doc(id).delete(); }
+  catch(e){ console.error('delete print failed', e); }
+}
+
+// ---- Real-time sync: re-load state and re-render whenever data changes on any device ----
+function subscribeRealtime(){
+  db.collection('quest-log-data').onSnapshot(async ()=>{
+    await loadState();
+    renderAll();
+  }, err => console.error('quest-log-data snapshot error', err));
+  db.collection('prints').orderBy('date','desc').onSnapshot(async ()=>{
+    await loadPrints();
+    renderPrints();
+  }, err => console.error('prints snapshot error', err));
 }
 
 // ---------------- State ----------------
@@ -564,13 +619,10 @@ let newSubjects = [];       // temp chip list while creating a period
 const SUBJECT_COLORS = ['#4FD8FF', '#FFB454', '#6EE7A8', '#B98CFF', '#FF6B6B'];
 
 // ---------------- Init ----------------
-async function init(){
-  document.getElementById('todayDateLabel').textContent = formatDateLabel(TODAY);
-
+async function loadState(){
   templates = (await storageGet('daily-templates')) || [];
   todayTasks = (await storageGet('today-tasks:'+TODAY)) || [];
   dailyStatus = (await storageGet('daily-status:'+TODAY)) || {};
-  prints = (await storageGet('prints')) || [];
   stats = (await storageGet('stats')) || { xp:0, streak:0, lastCompleteDate:null };
   notifiedDates = (await storageGet('notified-dates')) || {};
 
@@ -578,13 +630,19 @@ async function init(){
   for(const p of testPeriods){
     testTasksCache[p.id] = (await storageGet('test-tasks:'+p.id)) || [];
   }
-  if(testPeriods.length > 0){
+  if(!currentPeriodId && testPeriods.length > 0){
     // default to the soonest period whose end date hasn't passed, else the most recent
     const upcoming = testPeriods.filter(p => p.endDate >= TODAY).sort((a,b)=>a.startDate.localeCompare(b.startDate));
     currentPeriodId = (upcoming[0] || testPeriods[testPeriods.length-1]).id;
   }
+}
 
+async function init(){
+  document.getElementById('todayDateLabel').textContent = formatDateLabel(TODAY);
+  await loadState();
+  await loadPrints();
   renderAll();
+  subscribeRealtime();
 }
 
 function renderAll(){
@@ -593,6 +651,7 @@ function renderAll(){
   renderDaily();
   renderPrints();
   renderParentLog();
+  renderParentTestProgress();
   renderTestTab();
 }
 
@@ -1084,8 +1143,9 @@ function handlePhoto(event){
 async function confirmSavePrint(){
   if(!pendingPhoto) return;
   const memo = document.getElementById('memoInput').value.trim();
-  prints.unshift({ id: uid(), date: TODAY, dataUrl: pendingPhoto.dataUrl, memo });
-  await storageSet('prints', prints);
+  const newPrint = { id: uid(), date: TODAY, dataUrl: pendingPhoto.dataUrl, memo };
+  prints.unshift(newPrint);
+  await addPrintDoc(newPrint);
   pendingPhoto = null;
   closeModal('memoModal');
   renderPrints();
@@ -1101,7 +1161,7 @@ function openPrint(id){
 }
 async function deleteCurrentPrint(){
   prints = prints.filter(x=>x.id!==currentPrintId);
-  await storageSet('prints', prints);
+  await deletePrintDoc(currentPrintId);
   closeModal('printModal');
   renderPrints();
 }
