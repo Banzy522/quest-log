@@ -643,6 +643,26 @@ async function init(){
   await loadPrints();
   renderAll();
   subscribeRealtime();
+  startDateRolloverWatch();
+}
+
+// ---- Keep the app in sync with the real calendar date, even if left open overnight ----
+async function checkDateRollover(){
+  const freshToday = todayKey();
+  if(freshToday === TODAY) return;
+  TODAY = freshToday;
+  currentPeriodId = null; // let loadState() pick the right test period again for the new day
+  document.getElementById('todayDateLabel').textContent = formatDateLabel(TODAY);
+  await loadState();
+  renderAll();
+  showToast('日付が変わったので、今日のクエストをリセットしたよ');
+}
+function startDateRolloverWatch(){
+  // Check every minute, and also immediately whenever the phone screen/tab becomes active again
+  setInterval(checkDateRollover, 60 * 1000);
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden) checkDateRollover();
+  });
 }
 
 function renderAll(){
@@ -1284,4 +1304,3 @@ init();
 </script>
 </body>
 </html>
-
